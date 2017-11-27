@@ -6,12 +6,6 @@ import Bio.PDB.Model
 import optparse
 
 
-def checkFirst(res1,chain1,res2,chain2):
-    '''Check if res1 is first residue of chain1 
-    and if res2 is first residue of chain2'''
-    if res1 == chain1.get_list()[0] and res2 != chain2.get_list()[0]: return True
-    return False
-
 def superpose(chain1,res1,chain2,res2,structure):
     '''Superposes the atoms in chain2 res2 over those in chain1 res1
     Returns a tuple containing the rotation matrix and translation vector
@@ -23,17 +17,11 @@ def superpose(chain1,res1,chain2,res2,structure):
     
     # Get rid of hydrogens which may or may not exist in either structure and keep only
     # the phosphate backbone
-    extractBackbone(fixed)
-    extractBackbone(moving)
+    extractPhosphate(fixed)
+    extractPhosphate(moving)
     
-    # If either starts with the first nucleotide, there will be no phosphate at the beginning
-    # Fine if both do!
-    if checkFirst(res2,chain2,res1,chain1):
-        for i in range(3):
-            fixed.pop(0)
-    if checkFirst(res1,chain1,res2,chain2):
-        for i in range(3):
-            moving.pop(0)
+    # There should be five atoms in each atom set, if not, skip.
+    if len(fixed) != 5 or len(moving) != 5: return -1
     # Calculate the rotation matrix and translation vector
     try:
         sup.set_atoms(fixed,moving)
@@ -63,14 +51,15 @@ def writeCSV(matrices,outfile):
     out.close()
         
     
-def extractBackbone(atoms):
-    '''Given an input set of atoms, removes non-backbone atoms'''
+def extractPhosphate(atoms):
+    '''Given an input set of atoms, removes non-phosphate atoms'''
     # DNA backbone
-    backbone = ['P','OP1','OP2','O5\'','C5\'','C4\'','O4\'','C3\'','C4\'','O4\'','C2\'','C1\'']
+    # backbone = ['P','OP1','OP2','O5\'','C5\'','C4\'','O4\'','C3\'','C4\'','O4\'','C2\'','C1\'']
+    phosphate = ['P','OP1','OP2','O5\'','O3\'']
     i = 0
     size = len(atoms)
     while i < size:
-        if atoms[i].get_id() not in backbone:
+        if atoms[i].get_id() not in phosphate:
             atoms.pop(i)
             size -= 1
         else:
@@ -98,7 +87,9 @@ def main():
                 for res2 in chain2:
                     print(chain1.get_id(),res1.get_id()[1],chain2.get_id(),res2.get_id()[1])
                     # Superpose their phosphates and add them to the list
-                    output.append((chain1.get_id(),res1.get_id()[1],chain2.get_id(),res2.get_id()[1],superpose(chain1,res1,chain2,res2,structure)))
+                    sup = superpose(chain1,res1,chain2,res2,structure)
+                    if sup != -1:
+                        output.append((chain1.get_id(),res1.get_id()[1],chain2.get_id(),res2.get_id()[1],sup))
     # Write out the csv file
     writeCSV(output,outfile)
     
