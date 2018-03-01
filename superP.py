@@ -1,4 +1,5 @@
 #!/bin/env python
+from __future__ import print_function
 import Bio
 import Bio.PDB
 import Bio.PDB.Structure
@@ -20,8 +21,8 @@ def superpose(chain1,res1,chain2,res2,structure):
     extractPhosphate(fixed)
     extractPhosphate(moving)
     
-    # There should be five atoms in each atom set, if not, skip.
-    if len(fixed) != 5 or len(moving) != 5: return -1
+    # There should be four atoms in each atom set, if not, skip.
+    if len(fixed) != 4 or len(moving) != 4: return -1
     # Calculate the rotation matrix and translation vector
     try:
         sup.set_atoms(fixed,moving)
@@ -32,30 +33,29 @@ def superpose(chain1,res1,chain2,res2,structure):
         print ('moving atoms:',len(moving),moving)
         raise e
     # Return rotation matrix and translation vector
-    return sup.rotran
+    return (sup.rotran,sup.rms)
     
 def writeCSV(matrices,outfile):
     '''Takes our rotation matrices and translation vectors and outputs them as
      a csv file containing the chains,residues, and unrolled matrices and
       vectors in the following format:
-    chain1,res1,chain2,res2,m11,m12,m13,m21,m22,m23,m31,m32,m33,v1,v2,v3
+    chain1,res1,chain2,res2,m11,m12,m13,m21,m22,m23,m31,m32,m33,v1,v2,v3,rms
     '''
     out = open(outfile,"w+")
-    out.write("chain1,res1,chain2,res2,m11,m12,m13,m21,m22,m23,m31,m32,m33,v1,v2,v3\n")
-    for (chain1,res1,chain2,res2,(rot,tran)) in matrices:
+    out.write("chain1,res1,chain2,res2,m11,m12,m13,m21,m22,m23,m31,m32,m33,v1,v2,v3,rms\n")
+    for (chain1,res1,chain2,res2,((rot,tran),rms)) in matrices:
         out.write("%s,%i,%s,%i,"%(chain1,res1,chain2,res2))
         out.write("%f,%f,%f,"%(rot[0][0],rot[0][1],rot[0][2]))
         out.write("%f,%f,%f,"%(rot[1][0],rot[1][1],rot[1][2]))
         out.write("%f,%f,%f,"%(rot[2][0],rot[2][1],rot[2][2]))
-        out.write("%f,%f,%f\n"%(tran[0],tran[1],tran[2]))
+        out.write("%f,%f,%f,%f\n"%(tran[0],tran[1],tran[2],rms))
     out.close()
-        
-    
+
 def extractPhosphate(atoms):
     '''Given an input set of atoms, removes non-phosphate atoms'''
     # DNA backbone
     # backbone = ['P','OP1','OP2','O5\'','C5\'','C4\'','O4\'','C3\'','C4\'','O4\'','C2\'','C1\'']
-    phosphate = ['P','OP1','OP2','O5\'','O3\'']
+    phosphate = ['P','OP1','OP2','O5\'']
     i = 0
     size = len(atoms)
     while i < size:
@@ -64,6 +64,8 @@ def extractPhosphate(atoms):
             size -= 1
         else:
             i += 1
+    # Make sure they're all in the right order
+    atoms = sorted(atoms,key=lambda x: phosphate.index(x.get_id()))
             
 def main():
     parser = optparse.OptionParser()
