@@ -83,6 +83,7 @@ def removeSimilar(pdb,mat1,mat2,cutoff):
         # for every entry in mat2
         failed = False
         for entry2 in mat2:
+            print(entry1[0:4],entry2[0:4],'        ',end='\r')
             # load pdb
             parser = PDBParser()
             struc = parser.get_structure(pdb,pdb)
@@ -103,6 +104,7 @@ def removeSimilar(pdb,mat1,mat2,cutoff):
             dist = atoms2[0] - atoms1P[0]
             if dist < cutoff:
                 failed = True
+                print("\nRemoving",entry1[0:4])
                 break
         if not failed:
             output.append(entry1)
