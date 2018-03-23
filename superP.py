@@ -2,7 +2,7 @@
 from Bio.PDB import *
 import numpy as np
 import argparse
-
+import sys
 
 def superpose(chain1,res1,chain2,res2,structure):
     '''Superposes the atoms in chain2 res2 over those in chain1 res1
@@ -75,15 +75,24 @@ def readMatrix(matfile):
     output.pop(0)
     return output
     
-def removeSimilar(pdb,mat1,mat2,cutoff):
+def removeSimilar(pdb,mat1,mat2,cutoff,out):
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    mat1 = readMatrix(mat1)
+    mat2 = readMatrix(mat2)
     # initialize output
     output = []
     # for every entry in mat1
-    for entry1 in mat1:
+    for i in range(rank,len(mat1),size):
+    # for entry1 in mat1:
+        entry1 = mat1[i]
+        # print("entry1",entry1)
         # for every entry in mat2
         failed = False
         for entry2 in mat2:
-            print(entry1[0:4],entry2[0:4],'        ',end='\r')
+            print(' ',rank,entry1[0:4],entry2[0:4],'        ',end='\r');sys.stdout.flush()
             # load pdb
             parser = PDBParser()
             struc = parser.get_structure(pdb,pdb)
@@ -109,7 +118,7 @@ def removeSimilar(pdb,mat1,mat2,cutoff):
         if not failed:
             output.append(entry1)
     # return output
-    return output
+    writeCSV(output,"%s_%i.csv"%(out,rank))
     
 def main():
     parser = argparse.ArgumentParser()
@@ -117,26 +126,32 @@ def main():
     parser.add_argument('-f',dest='pdb',help='DNA PDB file to be superposed')
     # output csv file
     parser.add_argument('-o',dest='outfile',help='CSV file to save output to')
+    parser.add_argument('--sub',action='store_true')
+    parser.add_argument('-m1')
+    parser.add_argument('-m2')
     args = parser.parse_args()
     pdb = args.pdb
     outfile = args.outfile
     
-    # Read in pdb file
-    pdbParser = PDBParser()
-    structure = pdbParser.get_structure('structure',pdb)
-    # Initialize output list
-    output = []
-    # Iterating over every chain and residue
-    for chain1 in structure[0]:
-        for res1 in chain1:
-            for chain2 in structure[0]:
-                for res2 in chain2:
-                    print(chain1.get_id(),res1.get_id()[1],chain2.get_id(),res2.get_id()[1],end="\r")
-                    # Superpose their phosphates and add them to the list
-                    sup = superpose(chain1,res1,chain2,res2,structure)
-                    if sup != -1:
-                        output.append((chain1.get_id(),res1.get_id()[1],chain2.get_id(),res2.get_id()[1],sup))
-    # Write out the csv file
-    writeCSV(output,outfile)
+    if(args.sub):
+        removeSimilar(pdb,args.m1,args.m2,3.0,outfile)
+    else:
+        # Read in pdb file
+        pdbParser = PDBParser()
+        structure = pdbParser.get_structure('structure',pdb)
+        # Initialize output list
+        output = []
+        # Iterating over every chain and residue
+        for chain1 in structure[0]:
+            for res1 in chain1:
+                for chain2 in structure[0]:
+                    for res2 in chain2:
+                        print(chain1.get_id(),res1.get_id()[1],chain2.get_id(),res2.get_id()[1],end="\r")
+                        # Superpose their phosphates and add them to the list
+                        sup = superpose(chain1,res1,chain2,res2,structure)
+                        if sup != -1:
+                            output.append((chain1.get_id(),res1.get_id()[1],chain2.get_id(),res2.get_id()[1],sup))
+        # Write out the csv file
+        writeCSV(output,outfile)
     
 if __name__ == "__main__": main()
